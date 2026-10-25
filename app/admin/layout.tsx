@@ -17,13 +17,14 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabaseClient'
 
-const supabase = createClient()
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+
+  const supabase = createClient()
 
   // Jika di halaman login, tampilkan children saja tanpa sidebar
   if (pathname === '/admin/login') {
