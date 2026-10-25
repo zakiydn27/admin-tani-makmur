@@ -1,253 +1,290 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabaseClient'
 import { 
-  TrendingUp, 
   DollarSign, 
   ShoppingCart, 
   Package, 
-  Users,
-  ArrowUpRight,
-  ArrowDownRight
+  Users, 
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  CheckCircle,
+  Truck,
+  X
 } from 'lucide-react'
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts'
-import { createClient } from '@/lib/supabaseClient'
 
 const supabase = createClient()
 
-interface ChartData {
+interface OrderItem {
   name: string
-  penjualan: number
+  quantity: number
+  price: number
 }
 
-interface BarChartData {
+interface Order {
+  id: string
+  customer_name: string
+  customer_phone: string
+  customer_email: string
+  customer_address: string
+  total_price: number
+  status: string
+  notes: string
+  items: OrderItem[]
+  created_at: string
+  tracking_number?: string
+}
+
+interface WeeklyData {
+  date: string
+  total: number
+  count: number
+}
+
+interface TopProduct {
   name: string
-  sales: number
+  quantity: number
 }
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({
-    totalPenjualan: 0,
-    totalOrder: 0,
-    totalProduk: 0,
-    totalPelanggan: 0
+    totalSales: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalCustomers: 0,
+    pendingOrders: 0
   })
-  const [chartData, setChartData] = useState<ChartData[]>([])
+  const [recentOrders, setRecentOrders] = useState<Order[]>([])
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
+  const [weeklySales, setWeeklySales] = useState<WeeklyData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    loadDashboardData()
+    fetchDashboardData()
+    
+    const channel = supabase
+      .channel('orders-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, 
+        () => {
+          fetchDashboardData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
-  const loadDashboardData = async () => {
-    setLoading(true)
-    
-    const { count: produkCount } = await supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-    
-    const { count: orderCount } = await supabase
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
+  const fetchDashboardData = async () => {
+    try {
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-    const mockChartData: ChartData[] = [
-      { name: 'Sen', penjualan: 4000000 },
-      { name: 'Sel', penjualan: 3000000 },
-      { name: 'Rab', penjualan: 5000000 },
-      { name: 'Kam', penjualan: 4500000 },
-      { name: 'Jum', penjualan: 6000000 },
-      { name: 'Sab', penjualan: 7000000 },
-      { name: 'Min', penjualan: 5500000 },
-    ]
+      const { data: products } = await supabase
+        .from('products')
+        .select('*')
 
-    setStats({
-      totalPenjualan: 35000000,
-      totalOrder: orderCount || 0,
-      totalProduk: produkCount || 0,
-      totalPelanggan: 12
-    })
-    setChartData(mockChartData)
-    setLoading(false)
-  }
+      const totalSales = (orders || []).reduce((sum: number, order: Order) => sum + (order.total_price || 0), 0)
+      const totalOrders = orders?.length || 0
+      const totalProducts = products?.length || 0
+      
+      const uniqueCustomers = new Set((orders || []).map((o: Order) => o.customer_email))
+      const totalCustomers = uniqueCustomers.size
+      const pendingOrders = (orders || []).filter((o: Order) => o.status === 'pending').length
 
-  const formatRupiah = (angka: number) => {
-    return new Intl.NumberFormat('id-ID', { 
-      style: 'currency', 
-      currency: 'IDR', 
-      minimumFractionDigits: 0 
-    }).format(angka)
-  }
+      setStats({ totalSales, totalOrders, totalProducts, totalCustomers, pendingOrders })
+      setRecentOrders((orders || []).slice(0, 5))
 
-  const statCards = [
-    {
-      title: 'Total Penjualan',
-      value: formatRupiah(stats.totalPenjualan),
-      change: '+12.5%',
-      trend: 'up',
-      icon: DollarSign,
-      color: 'bg-green-500'
-    },
-    {
-      title: 'Total Order',
-      value: stats.totalOrder.toString(),
-      change: '+8.2%',
-      trend: 'up',
-      icon: ShoppingCart,
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Total Produk',
-      value: stats.totalProduk.toString(),
-      change: '+2',
-      trend: 'up',
-      icon: Package,
-      color: 'bg-purple-500'
-    },
-    {
-      title: 'Total Pelanggan',
-      value: stats.totalPelanggan.toString(),
-      change: '-3.1%',
-      trend: 'down',
-      icon: Users,
-      color: 'bg-orange-500'
+      const productSales: Record<string, TopProduct> = {} as Record<string, TopProduct>
+      (orders || []).forEach((order: Order) => {
+        if (order.items && Array.isArray(order.items)) {
+          order.items.forEach((item: OrderItem) => {
+            if (productSales[item.name]) {
+              productSales[item.name].quantity += item.quantity
+            } else {
+              productSales[item.name] = { name: item.name, quantity: item.quantity }
+            }
+          })
+        }
+      })
+
+      const topProductsList = Object.values(productSales)
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 5)
+      setTopProducts(topProductsList)
+
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date()
+        date.setDate(date.getDate() - (6 - i))
+        return date.toISOString().split('T')[0]
+      })
+
+      const weeklyData = last7Days.map(date => {
+        const dayOrders = (orders || []).filter((o: Order) => o.created_at?.startsWith(date))
+        const dayTotal = dayOrders.reduce((sum: number, o: Order) => sum + (o.total_price || 0), 0)
+        return { date, total: dayTotal, count: dayOrders.length }
+      })
+      setWeeklySales(weeklyData)
+      setLoading(false)
+    } catch (error) {
+      console.error('Error:', error)
+      setLoading(false)
     }
-  ]
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Memuat data...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Selamat datang kembali, Admin!</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard title="Total Penjualan" value={`Rp ${stats.totalSales.toLocaleString('id-ID')}`} icon={DollarSign} color="green" trend="+12.5%" trendUp={true} />
+        <StatCard title="Total Order" value={stats.totalOrders.toString()} icon={ShoppingCart} color="blue" trend="+8.2%" trendUp={true} />
+        <StatCard title="Total Produk" value={stats.totalProducts.toString()} icon={Package} color="purple" trend="+2" trendUp={true} />
+        <StatCard title="Total Pelanggan" value={stats.totalCustomers.toString()} icon={Users} color="orange" trend="-3.1%" trendUp={false} />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat, index) => (
-          <div key={index} className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`${stat.color} p-3 rounded-lg`}>
-                <stat.icon className="text-white" size={20} />
-              </div>
-              <div className={`flex items-center gap-1 text-sm font-medium ${
-                stat.trend === 'up' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {stat.trend === 'up' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                {stat.change}
-              </div>
-            </div>
-            <h3 className="text-gray-500 text-sm font-medium">{stat.title}</h3>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Penjualan Mingguan */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Penjualan Mingguan</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip 
-                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                formatter={(value) => formatRupiah(Number(value))}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="penjualan" 
-                stroke="#10b981" 
-                strokeWidth={2}
-                dot={{ fill: '#10b981', r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Penjualan Mingguan</h3>
+          <div className="h-64 flex items-end justify-between space-x-2">
+            {weeklySales.map((day, idx) => {
+              const maxTotal = Math.max(...weeklySales.map(d => d.total), 1)
+              const height = (day.total / maxTotal) * 100
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center">
+                  <div className="text-xs text-gray-500 mb-1">Rp {(day.total / 1000).toFixed(0)}k</div>
+                  <div className="w-full bg-green-500 rounded-t transition-all hover:bg-green-600" style={{ height: `${height}%` }} />
+                  <div className="text-xs text-gray-600 mt-2">
+                    {new Date(day.date).toLocaleDateString('id-ID', { weekday: 'short' })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Produk Terlaris */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Produk Terlaris</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={[
-              { name: 'Phostoxin', sales: 45 },
-              { name: 'Silamda', sales: 38 },
-              { name: 'Regent', sales: 32 },
-              { name: 'Furadan', sales: 28 },
-              { name: 'Decis', sales: 25 },
-            ]}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="name" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
-              <Bar dataKey="sales" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Produk Terlaris</h3>
+          {topProducts.length === 0 ? (
+            <div className="text-gray-500 text-center py-8">Belum ada data penjualan</div>
+          ) : (
+            <div className="space-y-4">
+              {topProducts.map((product, idx) => {
+                const maxQty = Math.max(...topProducts.map(p => p.quantity), 1)
+                const width = (product.quantity / maxQty) * 100
+                return (
+                  <div key={idx}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">{product.name}</span>
+                      <span className="text-gray-500">{product.quantity} terjual</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full transition-all" style={{ width: `${width}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Order Terbaru</h3>
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800">Order Terbaru</h3>
+          <a href="/admin/penjualan" className="text-sm text-blue-600 hover:underline">Lihat Semua →</a>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pelanggan</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {[
-                { id: 'ORD-001', customer: 'Budi Santoso', total: 250000, status: 'Selesai', date: '21 Okt 2026' },
-                { id: 'ORD-002', customer: 'Siti Aminah', total: 180000, status: 'Diproses', date: '21 Okt 2026' },
-                { id: 'ORD-003', customer: 'Ahmad Rizki', total: 320000, status: 'Dikirim', date: '20 Okt 2026' },
-              ].map((order, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{order.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{order.customer}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{formatRupiah(order.total)}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      order.status === 'Selesai' ? 'bg-green-100 text-green-700' :
-                      order.status === 'Diproses' ? 'bg-blue-100 text-blue-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{order.date}</td>
+        {recentOrders.length === 0 ? (
+          <div className="text-gray-500 text-center py-8">Belum ada order</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Order ID</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Pelanggan</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Total</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">Tanggal</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentOrders.map((order) => (
+                  <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-4 text-sm font-mono">#{order.id.slice(0, 8)}</td>
+                    <td className="py-3 px-4">
+                      <div className="text-sm font-medium text-gray-800">{order.customer_name}</div>
+                      <div className="text-xs text-gray-500">{order.customer_phone}</div>
+                    </td>
+                    <td className="py-3 px-4 text-sm font-semibold">Rp {order.total_price?.toLocaleString('id-ID')}</td>
+                    <td className="py-3 px-4"><StatusBadge status={order.status} /></td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {new Date(order.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+function StatCard({ title, value, icon: Icon, color, trend, trendUp }: { 
+  title: string; value: string; icon: React.ComponentType<{ className?: string }>; 
+  color: 'green' | 'blue' | 'purple' | 'orange'; trend: string; trendUp: boolean 
+}) {
+  const colorClasses: Record<string, string> = {
+    green: 'bg-green-500',
+    blue: 'bg-blue-500',
+    purple: 'bg-purple-500',
+    orange: 'bg-orange-500'
+  }
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`${colorClasses[color]} p-3 rounded-lg`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+        <div className={`flex items-center text-sm ${trendUp ? 'text-green-600' : 'text-red-600'}`}>
+          {trendUp ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
+          {trend}
+        </div>
+      </div>
+      <div className="text-sm text-gray-600 mb-1">{title}</div>
+      <div className="text-2xl font-bold text-gray-800">{value}</div>
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    pending: { label: 'Menunggu', color: 'bg-yellow-100 text-yellow-800' },
+    processing: { label: 'Diproses', color: 'bg-blue-100 text-blue-800' },
+    shipped: { label: 'Dikirim', color: 'bg-purple-100 text-purple-800' },
+    completed: { label: 'Selesai', color: 'bg-green-100 text-green-800' },
+    cancelled: { label: 'Dibatalkan', color: 'bg-red-100 text-red-800' }
+  }
+
+  const config = statusConfig[status] || statusConfig.pending
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+      {config.label}
+    </span>
   )
 }
