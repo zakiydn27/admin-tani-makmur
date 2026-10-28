@@ -6,6 +6,15 @@ import { createClient } from '@/lib/supabaseClient'
 
 const supabase = createClient()
 
+// ✅ Kategori yang SAMA PERSIS dengan web utama
+const CATEGORIES = [
+  'PEMBASMI HAMA GUDANG',
+  'PEMBASMI NYAMUK LALAT',
+  'PEMBASMI RAYAP',
+  'PEMBASMI TIKUS',
+  'ALAT PEMBASMI HAMA'
+]
+
 export default function AddProductPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -13,7 +22,7 @@ export default function AddProductPage() {
   
   const [formData, setFormData] = useState({
     name: '',
-    category: 'PEMBASMI HAMA GUDANG',
+    category: 'PEMBASMI HAMA GUDANG', // Default kategori pertama
     description: '',
     price: 0,
     stok: 0,
@@ -74,9 +83,18 @@ export default function AddProductPage() {
       alert('Gagal menambah produk: ' + error.message)
     } else {
       alert('Produk berhasil ditambahkan!')
+      // Reset form dengan kategori default yang valid
       setFormData({
-        name: '', category: 'PEMBASMI HAMA GUDANG', description: '', price: 0, stok: 0,
-        features: '', image: '', pestTarget: '', formulation: '', packaging: ''
+        name: '', 
+        category: 'PEMBASMI HAMA GUDANG', 
+        description: '', 
+        price: 0, 
+        stok: 0,
+        features: '', 
+        image: '', 
+        pestTarget: '', 
+        formulation: '', 
+        packaging: ''
       })
     }
     setLoading(false)
@@ -85,76 +103,84 @@ export default function AddProductPage() {
   if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p>Memeriksa autentikasi...</p>
+        <p className="text-gray-600">Memeriksa autentikasi...</p>
       </div>
     )
   }
 
   return (
     <div className="p-8">
-      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Tambah Produk Baru</h2>
+      <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6 border border-gray-100">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b pb-4">Tambah Produk Baru</h2>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Nama Produk</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Nama Produk <span className="text-red-500">*</span></label>
               <input 
                 name="name" 
                 required 
                 value={formData.name} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
+                placeholder="Contoh: KACONG 500gr"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Kategori</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Kategori <span className="text-red-500">*</span></label>
               <select 
                 name="category" 
                 value={formData.category} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900"
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all bg-white"
               >
-                <option value="PEMBASMI HAMA GUDANG">PEMBASMI HAMA GUDANG</option>
-                <option value="PEMBASMI HAMA PERTANIAN">PEMBASMI HAMA PERTANIAN</option>
-                <option value="PEMBASMI HAMA RUMAH TANGGA">PEMBASMI HAMA RUMAH TANGGA</option>
+                {/* ✅ Opsi Kategori yang Sudah Disinkronisasi */}
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1">Deskripsi</label>
+            <label className="block text-sm font-medium text-gray-900 mb-1">Deskripsi <span className="text-red-500">*</span></label>
             <textarea 
               name="description" 
               required 
-              rows={4} 
+              rows={8} 
               value={formData.description} 
               onChange={handleChange} 
-              className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all font-mono text-sm"
+              placeholder={`**APA ITU NAMA PRODUK?**\n\nDeskripsi singkat produk di sini.\n\n**PANDUAN & CARA PENGGUNAAN**\n\n1. Cara penggunaan pertama\n2. Cara penggunaan kedua\n\n**COCOK DIAPLIKASIKAN PADA**\n\n✓ Hama pertama\n✓ Hama kedua`}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Gunakan format: <code className="bg-gray-100 px-1 rounded text-green-700">**JUDUL**</code> untuk section, <code className="bg-gray-100 px-1 rounded text-green-700">1.</code> untuk list, <code className="bg-gray-100 px-1 rounded text-green-700">✓</code> untuk bullet
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Harga (Rp)</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Harga (Rp) <span className="text-red-500">*</span></label>
               <input 
                 type="number" 
                 name="price" 
                 required 
                 value={formData.price} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
+                placeholder="0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1">Stok</label>
+              <label className="block text-sm font-medium text-gray-900 mb-1">Stok <span className="text-red-500">*</span></label>
               <input 
                 type="number" 
                 name="stok" 
                 required 
                 value={formData.stok} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
+                placeholder="0"
               />
             </div>
             <div>
@@ -164,38 +190,20 @@ export default function AddProductPage() {
                 name="image" 
                 value={formData.image} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
                 placeholder="https://..." 
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Deskripsi <span className="text-red-500">*</span>
-            </label>
-            <textarea 
-              name="description" 
-              required 
-              rows={8} 
-              value={formData.description} 
-              onChange={handleChange} 
-              className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all font-mono text-sm"
-              placeholder={`**APA ITU NAMA PRODUK?**\n\nDeskripsi singkat produk di sini.\n\n**PANDUAN & CARA PENGGUNAAN**\n\n1. Cara penggunaan pertama\n2. Cara penggunaan kedua\n3. Cara penggunaan ketiga\n\n**COCOK DIAPLIKASIKAN PADA**\n\n✓ Hama pertama\n✓ Hama kedua\n✓ Hama ketiga`}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Gunakan format: <code className="bg-gray-100 px-1 rounded">**JUDUL**</code> untuk membuat section, <code className="bg-gray-100 px-1 rounded">1.</code> untuk list bernomor, <code className="bg-gray-100 px-1 rounded">✓</code> untuk bullet list
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">Target Hama</label>
               <input 
                 name="pestTarget" 
                 value={formData.pestTarget} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
                 placeholder="Cth: Kutu, Kumbang" 
               />
             </div>
@@ -205,7 +213,7 @@ export default function AddProductPage() {
                 name="formulation" 
                 value={formData.formulation} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
                 placeholder="Cth: Tablet, Cair" 
               />
             </div>
@@ -215,7 +223,7 @@ export default function AddProductPage() {
                 name="packaging" 
                 value={formData.packaging} 
                 onChange={handleChange} 
-                className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+                className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
                 placeholder="Cth: Kaleng 500gr" 
               />
             </div>
@@ -227,7 +235,7 @@ export default function AddProductPage() {
               name="features" 
               value={formData.features} 
               onChange={handleChange} 
-              className="w-full border border-gray-300 rounded p-2 text-gray-900" 
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all" 
               placeholder="Efektif, Tahan lama, Mudah digunakan" 
             />
           </div>
@@ -235,7 +243,7 @@ export default function AddProductPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 text-white font-bold py-3 rounded hover:bg-green-700 disabled:bg-green-300"
+            className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg mt-4"
           >
             {loading ? 'Menyimpan...' : 'Simpan Produk'}
           </button>

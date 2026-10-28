@@ -7,6 +7,15 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react'
     
 const supabase = createClient()
 
+// ✅ Kategori yang SAMA PERSIS dengan web utama dan halaman tambah produk
+const CATEGORIES = [
+  'PEMBASMI HAMA GUDANG',
+  'PEMBASMI NYAMUK LALAT',
+  'PEMBASMI RAYAP',
+  'PEMBASMI TIKUS',
+  'ALAT PEMBASMI HAMA'
+]
+
 export default function EditProductPage() {
   const router = useRouter()
   const params = useParams()
@@ -152,7 +161,7 @@ export default function EditProductPage() {
           <p className="text-gray-600 mb-6">Produk yang Anda cari tidak ada atau sudah dihapus.</p>
           <button
             onClick={() => router.push('/admin/produk')}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
           >
             Kembali ke Daftar Produk
           </button>
@@ -179,7 +188,7 @@ export default function EditProductPage() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Nama & Kategori */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -204,11 +213,12 @@ export default function EditProductPage() {
                   name="category" 
                   value={formData.category} 
                   onChange={handleChange} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all"
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all bg-white"
                 >
-                  <option value="PEMBASMI HAMA GUDANG">PEMBASMI HAMA GUDANG</option>
-                  <option value="PEMBASMI HAMA PERTANIAN">PEMBASMI HAMA PERTANIAN</option>
-                  <option value="PEMBASMI HAMA RUMAH TANGGA">PEMBASMI HAMA RUMAH TANGGA</option>
+                  {/* ✅ Opsi Kategori yang Sudah Disinkronisasi */}
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -351,7 +361,7 @@ export default function EditProductPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-all"
+                className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg"
               >
                 {saving ? (
                   <>
